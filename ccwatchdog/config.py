@@ -12,7 +12,7 @@ class Config:
     message: str = "继续"    # what gets typed into a cut-off session
     disabled: list = field(default_factory=list)  # session ids with protection turned off
     delay: int = 10          # seconds to wait after a cut-off before the first message
-    max_tries: int = 3       # attempts per session within `window` before pausing
+    max_tries: int = 5       # attempts per session within `window` before pausing
     window: int = 900
     max_age: int = 3600      # cut-offs older than this (e.g. found at startup) are left alone
 

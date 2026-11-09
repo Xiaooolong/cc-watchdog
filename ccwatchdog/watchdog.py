@@ -9,6 +9,7 @@ from .sessions import CLAUDE_DIR, live_sessions
 from .transcript import find_transcript, is_cutoff, last_turn_record
 
 IDLE = ("idle", "shell")  # "shell": turn ended, a background shell is still running
+MAX_WAIT = 180  # backoff cap per attempt, so all tries fit in the window
 SENT_GRACE = 15  # seconds to wait for the sent message to show up in the transcript
 
 
@@ -110,7 +111,7 @@ class Watchdog:
             if len(attempts) >= cfg.max_tries:
                 self._report(sid, uuid, "paused", f"{s.name}：{cfg.window // 60} 分钟内已断 {len(attempts)} 次，先暂停自动继续", warn=True)
                 return mark("连续断线，暂停自动继续", "paused")
-            wait = cfg.delay * 3 ** len(attempts) - (now - max(cut_at, last))
+            wait = min(cfg.delay * 3 ** len(attempts), MAX_WAIT) - (now - max(cut_at, last))
             if wait > 0:
                 return mark(f"断线，{int(wait) + 1} 秒后继续", "waiting")
 

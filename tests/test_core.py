@@ -134,7 +134,7 @@ def test_sends_continue_after_delay(env):
 def test_backoff_then_pause(env):
     dog, session, term, clock, events, root = env
     t = T0
-    for i, gap in enumerate([10, 30, 90]):
+    for i, gap in enumerate([10, 30, 90, 180, 180]):
         write_transcript(root, [cutoff_record(t, f"err-{i}")])
         clock.t = t + gap - 1
         dog.tick()
@@ -143,14 +143,14 @@ def test_backoff_then_pause(env):
         dog.tick()
         assert len(term.sent) == i + 1
         t = clock.t + 20
-    write_transcript(root, [cutoff_record(t, "err-3")])
-    clock.t = t + 600
+    write_transcript(root, [cutoff_record(t, "err-5")])
+    clock.t = t + 300
     dog.tick()
-    assert len(term.sent) == 3 and "暂停" in state(dog)
+    assert len(term.sent) == 5 and "暂停" in state(dog)
     assert events[-1][1] is True
-    clock.t = t + 1000  # attempts aged out of the 15-minute window
+    clock.t = T0 + 1000  # the first attempt aged out of the 15-minute window
     dog.tick()
-    assert len(term.sent) == 4
+    assert len(term.sent) == 6
 
 
 def test_skips_when_unprotected_old_busy_or_typing(env):
