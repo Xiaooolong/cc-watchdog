@@ -5,7 +5,7 @@ import secrets
 import subprocess
 import sys
 import threading
-from collections import deque
+from collections import Counter, deque
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -23,6 +23,7 @@ LOG = APP_DIR / "events.log"
 URL_FILE = APP_DIR / "url"
 TITLE = "CC Watchdog"
 TICK = 2
+AUTO_MARK = "自动发送“"  # in the event text written by Watchdog for an automatic continue
 ORDER = ["waiting", "paused", "blocked", "sent", "running", "idle", "unsupported"]
 user32 = ctypes.WinDLL("user32")
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -43,6 +44,7 @@ def open_window(url, proc=None):
 class App:
     def __init__(self):
         self.config = Config.load()
+        self.daily = Counter()  # date -> automatic continues, over the whole log
         self.events = deque(self._load_events(), maxlen=200)
         self.dog = Watchdog(self.config, self.event)
         self.token = secrets.token_urlsafe(16)
@@ -63,20 +65,25 @@ class App:
 
     def _load_events(self):
         try:
-            lines = LOG.read_text(encoding="utf-8").splitlines()[-200:]
+            lines = LOG.read_text(encoding="utf-8").splitlines()
         except OSError:
             return []
         out = []
         for ln in lines:
             try:
-                out.append(json.loads(ln))
+                e = json.loads(ln)
             except ValueError:
-                pass
-        return out
+                continue
+            out.append(e)
+            if AUTO_MARK in e["text"]:
+                self.daily[e["t"][:10]] += 1
+        return out[-200:]
 
     def event(self, text, warn=False):
         e = {"t": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "text": text, "warn": warn}
         self.events.append(e)
+        if AUTO_MARK in text:
+            self.daily[e["t"][:10]] += 1
         APP_DIR.mkdir(parents=True, exist_ok=True)
         with open(LOG, "a", encoding="utf-8") as f:
             f.write(json.dumps(e, ensure_ascii=False) + "\n")
@@ -96,7 +103,8 @@ class App:
                           "last": r.last_continue, "protected": r.session.session_id not in cfg.disabled}
                          for r in rows],
             "events": list(self.events)[::-1][:80],
-            "today": sum(1 for e in self.events if e["t"].startswith(today) and "发送“" in e["text"]),
+            "today": self.daily[today],
+            "total": sum(self.daily.values()),
         }
 
     def act(self, a):

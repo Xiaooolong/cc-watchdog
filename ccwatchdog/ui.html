@@ -27,7 +27,7 @@
   .master .label b { font-weight: 600; }
   .master .label span { color: var(--muted); margin-left: 6px; }
 
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
   .stat { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px 12px; }
   .stat .n { font: 400 30px/1.1 var(--serif); font-variant-numeric: lining-nums tabular-nums; }
   .stat .l { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
@@ -100,6 +100,7 @@
     <div class="stat"><div class="n" id="sRunning">–</div><div class="l">运行中</div></div>
     <div class="stat" id="sAttnBox"><div class="n" id="sAttn">–</div><div class="l">需要留意</div></div>
     <div class="stat"><div class="n" id="sToday">–</div><div class="l">今日自动继续</div></div>
+    <div class="stat"><div class="n" id="sGuarded">–</div><div class="l">累计守护</div></div>
   </section>
 
   <section class="card">
@@ -144,6 +145,7 @@ function render(s) {
   $("sAttn").textContent = attn;
   $("sAttnBox").classList.toggle("alert", attn > 0);
   $("sToday").textContent = s.today;
+  $("sGuarded").textContent = s.total;
 
   $("rows").innerHTML = rows.length ? rows.map(r => `
     <div class="row k-${r.kind}">

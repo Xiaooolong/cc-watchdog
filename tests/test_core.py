@@ -236,3 +236,12 @@ def test_gateway_errors_from_config(env):
     clock.t = T0 + 600
     dog.tick()
     assert len(term.sent) == 1 and state(dog) == "空闲"
+
+
+def test_auto_event_text_is_counted_by_app(env):
+    from ccwatchdog.app import AUTO_MARK
+    dog, session, term, clock, events, root = env
+    write_transcript(root, [cutoff_record(T0)])
+    clock.t = T0 + 60
+    dog.tick()
+    assert AUTO_MARK in events[-1][0]
