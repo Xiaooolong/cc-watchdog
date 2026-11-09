@@ -20,7 +20,8 @@ Claude Code 在终端里遇到「回复到一半断线」时，会停下来等�
 1. **找会话**：读 `~/.claude/sessions/*.json`，得到每个交互会话的进程、名字、目录和状态。
 2. **认断线**：读会话记录 `~/.claude/projects/*/<sessionId>.jsonl` 的末尾。最后一条对话记录如果是
    `isApiErrorMessage` 且 `truncatedAfterOutput` 的报错（或报错文本属于 mid-response 这一类），就算断线。
-   余额不足、限流、鉴权失败之类的报错不处理。
+   另外，`config.json` 里的 `extra_errors`（正则列表）可以把别的「回一句继续就能好」的报错也纳入，默认包含几种
+   常见的中转网关 503 和 TLS 握手失败。余额不足、限流、鉴权失败之类的报错不处理。
 3. **发「继续」**：用 Windows 控制台 API（`AttachConsole` + `WriteConsoleInputW`）往该会话所在终端的输入缓冲区
    打字，效果和你手敲完全一样。发之前先读一遍屏幕：输入框里已经有字就不发，免得和你正在打的内容混在一起；
    会话处于忙碌状态时，只有确认输入框在且为空才发。
@@ -61,7 +62,7 @@ python -m venv .venv
 都在 `%APPDATA%\cc-watchdog\`：
 
 - `config.json`：`message`（发送的内容，默认「继续」，可改成 `continue`）、`delay`（断线后等待秒数，默认 10）、`max_tries`（窗口期内最多次数，默认 5）、
-  `window`（窗口期秒数，默认 900）、`max_age`（超过多少秒的断线不自动处理，默认 3600）
+  `window`（窗口期秒数，默认 900）、`max_age`（超过多少秒的断线不自动处理，默认 3600）、`extra_errors`（额外要处理的报错正则）
 - `events.log`：发送记录
 
 ## 局限

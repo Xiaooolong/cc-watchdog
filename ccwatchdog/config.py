@@ -15,6 +15,12 @@ class Config:
     max_tries: int = 5       # attempts per session within `window` before pausing
     window: int = 900
     max_age: int = 3600      # cut-offs older than this (e.g. found at startup) are left alone
+    # regexes for other API errors that sending the message usually fixes
+    extra_errors: list = field(default_factory=lambda: [
+        r"transferred context could not be verified",
+        r"can no longer continue on its assigned route",
+        r"TLS handshake failed",
+    ])
 
     @classmethod
     def load(cls):

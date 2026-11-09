@@ -160,7 +160,7 @@ function render(s) {
   $("events").innerHTML = s.events.length ? s.events.map(e => `
     <li><time>${when(Date.parse(e.t.replace(" ", "T")))}</time><span class="${e.warn ? "warn" : ""}">${esc(e.text)}</span></li>`).join("")
     : `<li><time></time><span class="hint">还没有动态</span></li>`;
-  $("policy").textContent = `断线后等 ${s.delay} 秒发送；同一会话 ${Math.round(s.window / 60)} 分钟内最多 ${s.max_tries} 次，超过就先暂停`;
+  $("policy").textContent = `中断后等 ${s.delay} 秒发送；同一会话 ${Math.round(s.window / 60)} 分钟内最多 ${s.max_tries} 次，超过就先暂停`;
 }
 
 async function call(path, body) {

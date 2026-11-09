@@ -1,3 +1,4 @@
+import re
 import threading
 import time
 from collections import deque
@@ -41,6 +42,7 @@ class Watchdog:
         self._attempts = {}   # session id -> deque of attempt times
         self._last = {}       # session id -> last attempt time
         self._count = {}      # session id -> total messages sent
+        self._extra_key, self._extra_re = None, None
         self._warned = set()  # (session id, cut-off uuid, tag) already reported
 
     def snapshot(self):
@@ -58,6 +60,13 @@ class Watchdog:
         with self._lock:
             self.rows = rows
             self._manual &= rows.keys()
+
+    def _extra(self):
+        patterns = tuple(self.config.extra_errors)
+        if self._extra_key != patterns:
+            self._extra_key = patterns
+            self._extra_re = re.compile("|".join(f"(?:{p})" for p in patterns), re.I) if patterns else None
+        return self._extra_re
 
     def _last_record(self, sid):
         path = self._paths.get(sid)
@@ -86,12 +95,12 @@ class Watchdog:
             row.state, row.kind = state, kind
             return row
 
-        if not is_cutoff(rec):
+        if not is_cutoff(rec, self._extra()):
             return mark(*{"busy": ("运行中", "running"), "idle": ("空闲", "idle"),
                           "shell": ("空闲（后台命令在跑）", "idle")}.get(s.status, (s.status or "未知", "idle")))
         row.cutoff = True
         if s.entrypoint != "cli":
-            return mark("断线（非终端会话，无法自动继续）", "unsupported")
+            return mark("中断（非终端会话，无法自动继续）", "unsupported")
 
         manual = sid in self._manual
         attempts = self._attempts.setdefault(sid, deque())
@@ -105,28 +114,28 @@ class Watchdog:
             return mark(f"已发送“{cfg.message}”", "sent")
         if not manual:
             if not protected:
-                return mark("断线（未保护）", "blocked")
+                return mark("中断（未保护）", "blocked")
             if now - cut_at > cfg.max_age:
-                return mark("断线（较早，未自动继续）", "blocked")
+                return mark("中断（较早，未自动继续）", "blocked")
             if len(attempts) >= cfg.max_tries:
                 self._report(sid, uuid, "paused", f"{s.name}：{cfg.window // 60} 分钟内已断 {len(attempts)} 次，先暂停自动继续", warn=True)
-                return mark("连续断线，暂停自动继续", "paused")
+                return mark("连续中断，暂停自动继续", "paused")
             wait = min(cfg.delay * 3 ** len(attempts), MAX_WAIT) - (now - max(cut_at, last))
             if wait > 0:
-                return mark(f"断线，{int(wait) + 1} 秒后继续", "waiting")
+                return mark(f"中断，{int(wait) + 1} 秒后继续", "waiting")
 
         try:
             empty = self.term.prompt_is_empty(self.term.read_screen(s.pid))
             if empty is False:
-                return mark("断线，输入框里有内容，暂不发送", "blocked")
+                return mark("中断，输入框里有内容，暂不发送", "blocked")
             # not idle (e.g. background agents running): only type when the input box is clearly there,
             # so Enter can't land on some dialog
             if empty is None and s.status not in IDLE:
-                return mark("断线，没认出输入框，暂不发送", "blocked")
+                return mark("中断，没认出输入框，暂不发送", "blocked")
             self.term.type_line(s.pid, cfg.message)
         except OSError as e:
             self._report(sid, uuid, "oserror", f"{s.name}：发送失败（{e}）")
-            return mark("断线，连不上它的终端", "blocked")
+            return mark("中断，连不上它的终端", "blocked")
 
         attempts.append(now)
         self._last[sid] = row.last_continue = now

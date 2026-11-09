@@ -32,11 +32,12 @@ def last_turn_record(path, tail_bytes=256 * 1024):
     return None
 
 
-def is_cutoff(record):
+def is_cutoff(record, extra=None):
+    # extra: compiled regex for other errors that a "继续" usually fixes (gateway-specific 503s etc.)
     if not record or not record.get("isApiErrorMessage"):
         return False
     if record.get("truncatedAfterOutput"):
         return True
     content = (record.get("message") or {}).get("content") or []
     text = "".join(c.get("text", "") for c in content if isinstance(c, dict))
-    return bool(CUTOFF_TEXT.search(text))
+    return bool(CUTOFF_TEXT.search(text) or (extra and extra.search(text)))

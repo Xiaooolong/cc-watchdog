@@ -160,7 +160,7 @@ def test_skips_when_unprotected_old_busy_or_typing(env):
 
     dog.config.disabled = [SID]
     dog.tick()
-    assert state(dog) == "断线（未保护）"
+    assert state(dog) == "中断（未保护）"
     dog.config.disabled = []
 
     session.status = "busy"
@@ -218,3 +218,21 @@ def test_custom_message(env):
     clock.t = T0 + 60
     dog.tick()
     assert term.sent == [(42, "continue")] and state(dog) == "已发送“continue”"
+
+
+def test_gateway_errors_from_config(env):
+    dog, session, term, clock, events, root = env
+    rec = cutoff_record(T0)
+    del rec["truncatedAfterOutput"]
+    rec["message"]["content"][0]["text"] = ("API Error: 503 This session's transferred context could not be verified. "
+                                            "Start a new session and retry.")
+    write_transcript(root, [rec])
+    clock.t = T0 + 60
+    dog.tick()
+    assert term.sent == [(42, "继续")]
+    dog.config.extra_errors = []
+    rec["uuid"] = "err-2"
+    write_transcript(root, [rec])
+    clock.t = T0 + 600
+    dog.tick()
+    assert len(term.sent) == 1 and state(dog) == "空闲"
