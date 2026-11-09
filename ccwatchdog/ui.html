@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>CC Watchdog</title>
+<style>
+  :root {
+    --bg: #F0EEE6; --paper: #FAF9F5; --ink: #141413; --ink2: #3D3D3A; --muted: #87867F;
+    --line: #E6E2D6; --clay: #D97757; --clay-d: #BD5D3A; --olive: #788C5D; --sky: #6A9BCC;
+    --kraft: #D4A27F; --track: #D6D3C8;
+    --serif: Georgia, "Noto Serif SC", "Songti SC", serif;
+    --sans: "Segoe UI Variable Text", "Segoe UI", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { font: 14px/1.55 var(--sans); -webkit-font-smoothing: antialiased; font-variant-numeric: lining-nums; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 34px 40px 28px; }
+
+  header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
+  .brand { display: flex; gap: 14px; align-items: center; }
+  .brand .logo { width: 56px; height: 56px; flex: none; }
+  h1 { font: 400 30px/1.1 var(--serif); letter-spacing: -0.01em; margin: 0; }
+  .tagline { color: var(--muted); margin: 5px 0 0; font-size: 13.5px; }
+  .master { display: flex; align-items: center; gap: 12px; background: var(--paper);
+            border: 1px solid var(--line); border-radius: 999px; padding: 8px 10px 8px 18px; }
+  .master .label { font-size: 13.5px; }
+  .master .label b { font-weight: 600; }
+  .master .label span { color: var(--muted); margin-left: 6px; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .stat { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px 12px; }
+  .stat .n { font: 400 30px/1.1 var(--serif); font-variant-numeric: lining-nums tabular-nums; }
+  .stat .l { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  .stat.alert .n { color: var(--clay); }
+
+  .card { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; margin-bottom: 18px; overflow: hidden; }
+  .card-head { display: flex; justify-content: space-between; align-items: baseline; padding: 16px 22px 12px; }
+  h2 { font: 400 19px var(--serif); margin: 0; }
+  .hint { color: var(--muted); font-size: 12.5px; }
+
+  .row { display: grid; grid-template-columns: 10px minmax(0, 1.45fr) minmax(0, 1.25fr) 92px 38px;
+         align-items: center; gap: 16px; padding: 12px 22px; border-top: 1px solid var(--line); }
+  .row:hover { background: #F6F4EE; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--track); }
+  .k-running .dot { background: var(--olive); animation: pulse 2.2s ease-out infinite; }
+  .k-waiting .dot, .k-paused .dot { background: var(--clay); }
+  .k-sent .dot { background: var(--sky); }
+  .k-blocked .dot { background: var(--kraft); }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(120,140,93,.45); } 100% { box-shadow: 0 0 0 7px rgba(120,140,93,0); } }
+  .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cwd { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .state { font-size: 13px; color: var(--ink2); }
+  .k-waiting .state, .k-paused .state { color: var(--clay-d); }
+  .k-sent .state { color: #4E7FAF; }
+  .k-idle .state, .k-unsupported .state { color: var(--muted); }
+  .meta { color: var(--muted); font-size: 12px; }
+  .empty { padding: 28px 22px 30px; color: var(--muted); border-top: 1px solid var(--line); text-align: center; }
+
+  .btn { border: 1px solid var(--ink); background: transparent; color: var(--ink); border-radius: 999px;
+         padding: 4px 12px; font: inherit; font-size: 12.5px; cursor: pointer; justify-self: start; }
+  .btn:hover { background: var(--ink); color: var(--paper); }
+
+  .sw { width: 36px; height: 20px; border-radius: 999px; background: var(--track); position: relative;
+        cursor: pointer; transition: background .18s; flex: none; border: 0; padding: 0; }
+  .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+               background: #fff; box-shadow: 0 1px 2px rgba(20,20,19,.25); transition: transform .18s; }
+  .sw.on { background: var(--clay); }
+  .sw.on::after { transform: translateX(16px); }
+  .sw.dim { opacity: .4; }
+
+  .events { list-style: none; margin: 0; padding: 0 0 6px; max-height: 230px; overflow: auto; }
+  .events li { display: grid; grid-template-columns: 92px 1fr; gap: 12px; padding: 7px 22px; border-top: 1px solid var(--line); font-size: 13px; }
+  .events time { color: var(--muted); font-variant-numeric: lining-nums tabular-nums; }
+  .events .warn { color: var(--clay-d); }
+
+  footer { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 12.5px; padding: 4px 4px 0; }
+  footer .auto { display: flex; align-items: center; gap: 10px; color: var(--ink2); }
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-thumb { background: #D6D3C8; border-radius: 10px; border: 3px solid var(--paper); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+<img class="logo" src="/icon.png" alt="">
+      <div>
+        <h1>CC Watchdog</h1>
+        <p class="tagline">Claude Code 断线时，替你说一声「继续」</p>
+      </div>
+    </div>
+    <div class="master">
+      <div class="label"><b>自动继续</b><span id="masterText"></span></div>
+      <button class="sw" id="master" data-act="enabled"></button>
+    </div>
+  </header>
+
+  <section class="stats">
+    <div class="stat"><div class="n" id="sTotal">–</div><div class="l">活跃会话</div></div>
+    <div class="stat"><div class="n" id="sRunning">–</div><div class="l">运行中</div></div>
+    <div class="stat" id="sAttnBox"><div class="n" id="sAttn">–</div><div class="l">需要留意</div></div>
+    <div class="stat"><div class="n" id="sToday">–</div><div class="l">今日自动继续</div></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>会话</h2><span class="hint">右侧开关控制单个会话是否自动继续</span></div>
+    <div id="rows"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>最近动态</h2><span class="hint" id="logHint"></span></div>
+    <ol class="events" id="events"></ol>
+  </section>
+
+  <footer>
+    <span id="policy"></span>
+    <span class="auto">开机自启 <button class="sw" id="autostart" data-act="autostart"></button></span>
+  </footer>
+</div>
+
+<script>
+const token = new URLSearchParams(location.search).get("t");
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+let state = null;
+
+function when(ms) {
+  if (!ms) return "";
+  const d = new Date(ms), now = new Date(), p = n => String(n).padStart(2, "0");
+  const hm = `${p(d.getHours())}:${p(d.getMinutes())}`;
+  return d.toDateString() === now.toDateString() ? hm : `${p(d.getMonth() + 1)}-${p(d.getDate())} ${hm}`;
+}
+
+function render(s) {
+  state = s;
+  $("master").classList.toggle("on", s.enabled);
+  $("masterText").textContent = s.enabled ? "守护中" : "已暂停";
+  $("autostart").classList.toggle("on", s.autostart);
+
+  const rows = s.sessions;
+  const attn = rows.filter(r => ["paused", "blocked", "unsupported"].includes(r.kind)).length;
+  $("sTotal").textContent = rows.length;
+  $("sRunning").textContent = rows.filter(r => r.kind === "running").length;
+  $("sAttn").textContent = attn;
+  $("sAttnBox").classList.toggle("alert", attn > 0);
+  $("sToday").textContent = s.today;
+
+  $("rows").innerHTML = rows.length ? rows.map(r => `
+    <div class="row k-${r.kind}">
+      <span class="dot"></span>
+      <div><div class="name" title="${esc(r.name)}">${esc(r.name)}</div><div class="cwd" title="${esc(r.cwd)}">${esc(r.cwd)}</div></div>
+      <div><div class="state">${esc(r.state)}</div>
+        <div class="meta">${r.count ? `已续 ${r.count} 次 · 最近 ${when(r.last * 1000)}` : ""}</div></div>
+      <div>${r.cutoff && r.kind !== "sent" && r.kind !== "unsupported"
+        ? `<button class="btn" data-act="continue" data-id="${r.id}">立即继续</button>` : ""}</div>
+      <button class="sw ${r.protected ? "on" : ""} ${s.enabled ? "" : "dim"}" data-act="protect" data-id="${r.id}"
+        title="${r.protected ? "已保护" : "未保护"}"></button>
+    </div>`).join("") : `<div class="empty">暂时没有正在运行的 Claude Code 会话</div>`;
+
+  $("events").innerHTML = s.events.length ? s.events.map(e => `
+    <li><time>${when(Date.parse(e.t.replace(" ", "T")))}</time><span class="${e.warn ? "warn" : ""}">${esc(e.text)}</span></li>`).join("")
+    : `<li><time></time><span class="hint">还没有动态</span></li>`;
+  $("policy").textContent = `断线后等 ${s.delay} 秒发送；同一会话 ${Math.round(s.window / 60)} 分钟内最多 ${s.max_tries} 次，超过就先暂停`;
+}
+
+async function call(path, body) {
+  const r = await fetch(`${path}?t=${token}`, body ? {method: "POST", body: JSON.stringify(body)} : {});
+  if (r.ok) render(await r.json());
+}
+
+document.addEventListener("click", e => {
+  const el = e.target.closest("[data-act]");
+  if (!el || !state) return;
+  const act = el.dataset.act, id = el.dataset.id;
+  if (act === "continue") return call("/api/action", {action: act, id});
+  const value = !el.classList.contains("on");
+  el.classList.toggle("on", value);
+  call("/api/action", {action: act, id, value});
+});
+
+call("/api/state");
+setInterval(() => call("/api/state"), 1000);
+</script>
+</body>
+</html>
